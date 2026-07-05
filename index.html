@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>语文小帮手 🌈</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 顶部装饰 -->
+  <div class="top-deco">
+    <span class="deco-icon">🌸</span><span class="deco-icon">📚</span>
+    <span class="deco-icon">✏️</span><span class="deco-icon">🌟</span><span class="deco-icon">🎈</span>
+  </div>
+
+  <!-- 主容器 -->
+  <div class="container">
+    <!-- 标题区 -->
+    <header class="header">
+      <div class="header-emoji">🧸</div>
+      <h1>语文小帮手</h1>
+      <p class="subtitle">小学老师的好朋友 💕</p>
+      <button id="btn-settings" onclick="showSettings()" title="设置">⚙️</button>
+    </header>
+
+    <!-- 切换标签 -->
+    <div class="tab-bar">
+      <button class="tab active" id="tab-knowledge" onclick="switchTab('knowledge')">
+        <span class="tab-icon">📖</span> 知识点助手
+      </button>
+      <button class="tab" id="tab-wrong" onclick="switchTab('wrong')">
+        <span class="tab-icon">🔍</span> 错题分析仪
+      </button>
+    </div>
+
+    <!-- 板块一：知识点助手 -->
+    <div id="panel-knowledge" class="panel active" style="display:block;">
+      <div class="panel-header">
+        <span class="panel-emoji">📝</span>
+        <h2>输入知识点，一键获取教学全攻略！</h2>
+      </div>
+      <div class="input-area">
+        <label for="knowledge-input">✨ 输入一个语文知识点：</label>
+        <div class="input-wrapper">
+          <input type="text" id="knowledge-input"
+            placeholder="例如：比喻句、成语填空、阅读理解…"
+            onkeydown="if(event.key==='Enter') generateKnowledge()" />
+          <button class="btn-clear" onclick="clearInput('knowledge-input')">✕</button>
+        </div>
+        <button class="btn-generate" onclick="generateKnowledge()">🚀 开始生成</button>
+      </div>
+      <div id="loading-knowledge" class="loading" style="display:none;">
+        <div class="loading-dots"><span></span><span></span><span></span></div>
+        <p>小帮手正在努力思考中… 🤔</p>
+      </div>
+      <div id="result-knowledge" class="result-area" style="display:none;"></div>
+    </div>
+
+    <!-- 板块二：错题分析仪 -->
+    <div id="panel-wrong" class="panel" style="display:none;">
+      <div class="panel-header">
+        <span class="panel-emoji">🔧</span>
+        <h2>输入错题，智能诊断+生成练习！</h2>
+      </div>
+      <div class="input-area">
+        <label for="wrong-input">✨ 输入一道错题（题目+孩子的错误答案），或直接拍照上传：</label>
+
+        <!-- 图片上传区 -->
+        <div class="image-upload-area" id="image-upload-area" onclick="document.getElementById('image-input').click()">
+          <div class="upload-placeholder" id="upload-placeholder">
+            <span class="upload-icon">📷</span>
+            <span>点击或拖拽图片到这里</span>
+            <span class="upload-hint">支持 JPG / PNG，AI 自动识别错题内容</span>
+          </div>
+          <div id="image-preview-wrap" style="display:none;position:relative;">
+            <img id="image-preview" style="max-width:100%;max-height:200px;border-radius:12px;" />
+            <button type="button" onclick="event.stopPropagation();clearImagePreview();" style="
+              position:absolute;top:4px;right:4px;width:24px;height:24px;
+              border:none;border-radius:50%;background:rgba(255,107,157,0.85);
+              color:#fff;font-size:14px;cursor:pointer;line-height:24px;text-align:center;
+              box-shadow:0 2px 6px rgba(0,0,0,0.15);">✕</button>
+          </div>
+        </div>
+        <input type="file" id="image-input" accept="image/jpeg,image/png,image/webp"
+          style="display:none;" onchange="handleImageUpload(this)" />
+
+        <!-- 文字输入 -->
+        <div class="input-wrapper textarea-wrapper">
+          <textarea id="wrong-input" rows="4"
+            placeholder="例如：题目：他的成绩蒸蒸日上。（判断是否正确并改正）&#10;孩子的答案：正确，不用改&#10;&#10;👆 或直接上传错题照片 👇"></textarea>
+          <button class="btn-clear" onclick="clearInput('wrong-input')">✕</button>
+        </div>
+        <button class="btn-generate btn-green" onclick="generateWrong()">🔍 开始分析</button>
+      </div>
+      <div id="loading-wrong" class="loading" style="display:none;">
+        <div class="loading-dots green-dots"><span></span><span></span><span></span></div>
+        <p>小帮手正在诊断错题中… 🩺</p>
+      </div>
+      <div id="result-wrong" class="result-area" style="display:none;"></div>
+    </div>
+
+    <!-- 使用说明 -->
+    <div class="tips-box">
+      <h3>💡 使用小贴士</h3>
+      <ul>
+        <li><strong>知识点助手：</strong>输入任意小学语文知识点，获取定义、讲解方法、做题技巧等全套教学建议！</li>
+        <li><strong>错题分析仪：</strong>输入孩子的错题，获取解题步骤、易错点分析，还能生成5道同知识点练习题！</li>
+        <li>生成的练习题会生成一个专属链接和二维码，扫码就能让孩子直接做题 📱</li>
+      </ul>
+    </div>
+
+    <footer class="footer">
+      <p>💕 Made with love for 小学老师们 🌈</p>
+      <p class="footer-small">语文小帮手 · 让教学更轻松</p>
+    </footer>
+  </div>
+
+  <!-- 底部装饰 -->
+  <div class="bottom-deco"><span>🌻</span><span>🦋</span><span>🌈</span><span>🎀</span><span>🌷</span></div>
+
+  <!-- 设置弹窗 -->
+  <div id="settings-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;max-width:420px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.2);">
+      <h3 style="margin:0 0 16px;color:#5e548e;font-size:18px;">⚙️ API Key 设置</h3>
+      <p style="font-size:13px;color:#9d8eb5;margin-bottom:16px;line-height:1.6;">
+        云端模式需要配置 API Key 才能使用 AI 功能。<br>Key 只保存在你的浏览器本地，不会上传到任何服务器。
+      </p>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-weight:700;font-size:13px;color:#5e548e;margin-bottom:4px;">🤖 DeepSeek API Key（文本分析）</label>
+        <input id="settings-ds-key" type="password" placeholder="sk-..." style="width:100%;padding:10px 12px;border:2px solid #e8dff5;border-radius:10px;font-size:13px;box-sizing:border-box;font-family:monospace;" />
+        <p style="font-size:11px;color:#bbb;margin-top:3px;">获取地址：https://platform.deepseek.com/api_keys</p>
+      </div>
+      <div style="margin-bottom:14px;">
+        <label style="display:block;font-weight:700;font-size:13px;color:#5e548e;margin-bottom:4px;">👁️ Gemini API Key（图片识别，可选）</label>
+        <input id="settings-gm-key" type="password" placeholder="不填也能用！" style="width:100%;padding:10px 12px;border:2px solid #e8dff5;border-radius:10px;font-size:13px;box-sizing:border-box;font-family:monospace;" />
+        <p style="font-size:11px;color:#4ade80;margin-top:3px;">✅ 不填也完全能用！系统会自动用本地AI识别图片</p>
+      </div>
+      <div style="margin-bottom:18px;background:#f0f9ff;padding:12px;border-radius:10px;border:2px solid #bae6fd;">
+        <label style="display:block;font-weight:700;font-size:13px;color:#0369a1;margin-bottom:4px;">☁️ GitHub Token（<strong>练习题微信分享</strong>必填）</label>
+        <input id="setting-gh-token" type="password" placeholder="ghp_..." style="width:100%;padding:10px 12px;border:2px solid #bae6fd;border-radius:10px;font-size:13px;box-sizing:border-box;font-family:monospace;" />
+        <p style="font-size:11px;color:#0369a1;margin-top:3px;">获取：GitHub → Settings → Developer settings → Personal access tokens → 勾选 repo 权限</p>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="saveSettings()" style="flex:1;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#ff8fab,#c8b6ff);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">✅ 保存</button>
+        <button onclick="closeSettings()" style="padding:10px 20px;border:none;border-radius:10px;background:#f0e6ff;color:#5e548e;font-weight:700;font-size:14px;cursor:pointer;">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 内联库 -->
+  <script>
+  var LZString=function(){var r=String.fromCharCode,o="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",n="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-$",e={};function t(r,o){if(!e[r]){e[r]={};for(var n=0;n<r.length;n++)e[r][r.charAt(n)]=n}return e[r][o]}var i={compressToBase64:function(r){if(null==r)return"";var n=i._compress(r,6,function(r){return o.charAt(r)});switch(n.length%4){default:case 0:return n;case 1:return n+="===";case 2:return n+="==";case 3:return n+"="}},decompressFromBase64:function(r){return null==r?"":""==r?null:i._decompress(r.length,32,function(n){return t(o,r.charAt(n))})},compressToUTF16:function(o){return null==o?"":i._compress(o,15,function(o){return r(o+32)})+" "},decompressFromUTF16:function(r){return null==r?"":""==r?null:i._decompress(r.length,16384,function(o){return r.charCodeAt(o)-32})},compressToUint8Array:function(r){for(var o=i.compress(r),n=new Uint8Array(2*o.length),e=0,t=o.length;e<t;e++){var s=o.charCodeAt(e);n[2*e]=s>>>8,n[2*e+1]=s%256}return n},decompressFromUint8Array:function(o){if(null==o)return i.decompress(o);for(var n=new Array(o.length/2),e=0,t=n.length;e<t;e++)n[e]=256*o[2*e]+o[2*e+1];var s=[];return n.forEach(function(o){s.push(r(o))}),i.decompress(s.join(""))},compressToEncodedURIComponent:function(r){return null==r?"":i._compress(r,6,function(r){return n.charAt(r)})},decompressFromEncodedURIComponent:function(r){return null==r?"":""==r?null:(r=r.replace(/ /g,"+"),i._decompress(r.length,32,function(o){return t(n,r.charAt(o))}))},compress:function(o){return i._compress(o,16,function(o){return r(o)})},_compress:function(r,o,n){if(null==r)return"";var e,t,i,s={},u={},a="",p="",c="",l=2,f=3,h=2,d=[],m=0,v=0;for(i=0;i<r.length;i+=1)if(a=r.charAt(i),Object.prototype.hasOwnProperty.call(s,a)||(s[a]=f++,u[a]=!0),p=c+a,Object.prototype.hasOwnProperty.call(s,p))c=p;else{if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;m|=c.charCodeAt(0)<<v,v+=8}else{for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;m|=c.charCodeAt(0)>>h-e>0?0:h-e,v+=h-(t=c.charCodeAt(0))>>h-e>0?0:h-e}for(e=0;e<h;e++){m<<=1;if(v==o-1)v=0,d.push(n(m)),m=0;else v++}l<=Math.pow(2,h)-1?(u[c]=l++,l===Math.pow(2,h)&&(h++)):delete u[c],c=String(a)}else c=String(a)}if(c!==""){if(Object.prototype.hasOwnProperty.call(u,c)){if(c.charCodeAt(0)<256){for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;m|=c.charCodeAt(0)<<v,v+=8}else{for(e=0;e<h;e++)m<<=1,v==o-1?(v=0,d.push(n(m)),m=0):v++;m|=(t=c.charCodeAt(0))-h>0?t>>h-e>0?0:h-e:t,v+=h-(t=c.charCodeAt(0))>>h-e>0?0:h-e}for(e=0;e<h;e++){m<<=1;if(v==o-1)v=0,d.push(n(m)),m=0;else v++}l<=Math.pow(2,h)-1?(u[c]=l++,(l=Math.pow(2,h))&&(h++)):delete u[c]}}for(t=2,e=0;e<u.length;e+=1){t=e<u.length-1?f:f+1,s=u[e],i[s]=t}for(s=Object.keys(i),e=0;e<s.length;e+=1)a=s[e],d.push(i[a]);return d.join("")},_decompress:function(o,n,t){var i=[],s,u=4,a=4,p=1,c=[],l={val:n&65535,position:-index,index:o>=0?o:o.length-1};for(o=o>=0?o:o.length-1;;){if(l.position+l.index>=o.length)break;s=r(l.val>>>l.index);if(i.push(s),l.index+=n,l.index>=u)break}var f,h,d,m=i.slice(0,p),v=m[0],g=m[1],y=v,b=g,w=null,A=0;for(f=p;f<i.length-f;){if(w=f<m.length-1?g:m[f+1],A=w<v?v-w:v+w-v,y=v,v=g,g=w,null!=d[y])b=d[y];else if(y<A)d[y]=b=b<<1|r(y===g?0:1),A*=2;else{var E=r(0);d[y]=b=A<<1|E,A*=2}if(m.push(b),g===m[f+1]&&f++,f+m.length>p)p=f,m=m.slice(f,f+m.length),v=m[0],g=m[1]}return m.slice(p).join("")}};return i}();
+  </script>
+  
+<!-- 主应用 JS -->
+  <script src="app.js?v=61"></script>
+</body>
+</html>
