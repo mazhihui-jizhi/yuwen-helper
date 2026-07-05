@@ -585,85 +585,159 @@ async function uploadQuizToGithub(retryCount) {
   }
 }
 
-// ===== 生成独立练习题 HTML（v60: 自带解析器兜底，永不空白）=====
+// ===== 生成独立练习题 HTML（v64: 静态DOM方案，彻底解决空白）=====
+// ★ 核心改变：不再用JS动态生成DOM，而是直接把题目写成静态HTML元素
+// 这样即使JS出错，题目内容也一定能显示出来
 function generateStandaloneQuizHtml(quizText, quizId) {
+  // 1. 解析出题目数组
   var questions = null;
-  var rawData = ''; // ★ 保留原始数据作为兜底
-
-  // 支持JSON格式
-  if (quizText && quizText.indexOf('__JSON__:') === 0) {
-    try { questions = JSON.parse(quizText.substring(8)); } catch(e) { console.warn('[Quiz] 独立页JSON解析失败:', e); }
+  if (quizText && quizText.indexOf("__JSON__:") === 0) {
+    try { questions = JSON.parse(quizText.substring(8)); } catch(e) {}
   }
-  if (!questions) {
-    // ★ 兜底：尝试多种解析方式
+  if (!questions || !questions.length) {
     questions = parseQuizText(quizText);
-    if (questions.length === 0 && quizText) {
-      // 最后兜底：尝试直接从原始文本提取（宽松模式）
-      questions = parseQuizTextLoose(quizText);
+    if (!questions || !questions.length) questions = parseQuizTextLoose(quizText);
+  }
+
+  // 2. 没有有效数据 → 显示错误页面（但不是空白的）
+  if (!questions || !questions.length === 0) {
+    var raw = (quizText || "(无数据)").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    return "<!DOCTYPE html><html lang=zh-CN><head><meta charset=UTF-8><title>练习题-数据为空</title>" +
+      "<style>body{font-family:sans-serif;background:#fce4ec;padding:40px}.box{background:#fff;border-radius:20px;padding:30px;max-width:500px;margin:auto}" +
+      ".icon{font-size:50px;text-align:center}.t{font-size:18px;font-weight:700;color:#5e548e;text-align:center;margin:16px 0}" +
+      ".msg{font-size:14px;color:#666;background:#fff5f5;padding:16px;border-radius:12px;white-space:pre-wrap;word-break:break-all}</style></head><body>" +
+      "<div class=box><div class=icon>📝</div><div class=t>练习题数据未能加载</div>" +
+      "<div class=msg>" + raw + "</div></div></body></html>";
+  }
+
+  // 3. 开始构建HTML —— 静态DOM方案
+  var h = "<!DOCTYPE html><html lang=\"zh-CN\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no\">";
+  h += "<title>语文小帮手 - 练习题</title>";
+
+  // CSS
+  h += "<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:linear-gradient(135deg,#fce4ec,#e8daef);min-height:100vh;color:#333}";
+  h += ".hd{background:linear-gradient(135deg,#ff8fab,#c8b6ff);padding:18px;text-align:center;color:#fff;font-size:17px;font-weight:700}";
+  h += ".info{display:flex;justify-content:space-between;padding:12px 16px;background:#fff;margin:12px;border-radius:14px;font-size:14px;font-weight:700;color:#5e548e}";
+  h += ".pb{height:6px;background:#eee;margin:0 16px}.pf{height:100%;background:linear-gradient(90deg,#ff8fab,#c8b6ff);transition:width .4s}";
+  h += ".qa{margin:16px;padding:20px;background:#fff;border-radius:16px;display:none}.qa.active{display:block}";
+  h += ".qn{font-size:13px;color:#9d8eb5;margin-bottom:8px}";
+  h += ".qt{font-size:16px;font-weight:700;color:#5e548e;margin-bottom:16px;line-height:1.6}";
+  h += ".opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}";
+  h += ".opt{padding:14px;border:2px solid #e8dff5;border-radius:12px;cursor:pointer;font-size:14px;display:flex;align-items:center;transition:all .2s}";
+  h += ".opt.ok{border-color:#10b981;background:#ecfdf5}.opt.ng{border-color:#ef4444;background:#fef2f2}.opt.sc{border-color:#10b981;background:#ecfdf5}";
+  h += ".lt{display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0e6ff;color:#5e548e;font-size:13px;font-weight:700;text-align:center;line-height:26px;margin-right:10px}";
+  h += ".ex{margin:16px;padding:14px;background:#fefce8;border-left:4px solid #f59e0b;font-size:13px;color:#92400e;display:none}.ex.show{display:block}";
+  h += ".result{text-align:center;padding:30px 20px;display:none}.result.show{display:block}";
+  h += ".stars{font-size:60px}.msg{font-size:20px;font-weight:700;color:#5e548e;margin-bottom:8px}.score{font-size:16px;color:#9d8eb5;margin-bottom:24px}";
+  h += ".btn{padding:12px 28px;border:none;border-radius:20px;background:linear-gradient(135deg,#ff8fab,#c8b6ff);color:#fff;font-size:15px;font-weight:700;cursor:pointer}";
+  h += "</style></head><body>";
+
+  // 标题栏
+  h += "<div class=\"hd\">语文小帮手 - 练习题</div>";
+  h += "<div class=\"info\"><div id=\"sc\">0分</div><div id=\"pt\">第1题/" + questions.length + "题</div><div>❤️❤️❤️</div></div>";
+  h += "<div class=\"pb\"><div class=\"pf\" id=\"pbf\"></div></div>";
+
+  // ★ 核心：每道题直接写成静态HTML！不依赖JS生成
+  var L = ["A","B","C","D"];
+  for (var i = 0; i < questions.length; i++) {
+    var q = questions[i];
+    var activeCls = (i === 0) ? " active" : "";
+
+    // 题目卡片
+    h += "<div class=\"qa" + activeCls + "\" id=\"q" + i + "\">";
+    h += "<div class=\"qn\">第" + (i+1) + "题 / " + questions.length + "题</div>";
+    h += "<div class=\"qt\">" + escHtml(q.question) + "</div>";   // ← 题目文本直接在HTML中！
+
+    // 选项
+    h += "<div class=\"opts\">";
+    for (var j = 0; j < q.options.length; j++) {
+      // data-idx 让JS知道是哪个选项
+      h += "<div class=\"opt\" id=\"q" + i + "_o" + j + "\" data-idx=\"" + j + "\" onclick=\"sO(" + i + ",this)\">";
+      h += "<span class=\"lt\">" + L[j] + "</span>" + escHtml(q.options[j]);  // ← 选项文本直接在HTML中！
+      h += "</div>";
     }
+    h += "</div>";  // opts
+    h += "</div>";  // qa
   }
 
-  // ★ 始终保留原始数据，嵌入HTML供客户端备用
-  if (quizText) {
-    rawData = quizText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/<\/script>/gi, '<\\/script>');
-  }
+  // 解析区域（共享一个）
+  h += "<div class=\"ex\" id=\"ex-box\"><strong>解析：</strong><span id=\"ex-text\"></span></div>";
 
-  // 没有有效题目时：仍然尝试渲染（带原始数据显示），而不是返回空页面
-  if (!questions || questions.length === 0) {
-    // 返回带原始数据的页面，客户端可以查看
-    var safeRaw = (rawData || '(无数据)').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>练习题</title>' +
-    '<style>body{font-family:sans-serif;background:linear-gradient(135deg,#fce4ec,#e8daef);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}' +
-    '.box{background:#fff;border-radius:20px;padding:40px 30px;text-align:center;max-width:500px;width:100%;box-shadow:0 4px 20px rgba(200,182,255,0.25)}' +
-    '.icon{font-size:50px;margin-bottom:16px}.title{font-size:18px;font-weight:700;color:#5e548e;margin-bottom:12px}' +
-    '.msg{font-size:14px;color:#666;line-height:1.8;text-align:left;background:#fff5f5;border-radius:12px;padding:14px;margin-top:16px;white-space:pre-wrap;word-break:break-all}</style></head><body>' +
-    '<div class="box"><div class="icon">📝</div><div class="title">练习题目解析失败</div>' +
-    '<p style="color:#888;font-size:13px;">无法从AI返回结果中解析出题目。原始数据如下：</p>' +
-    '<div class="msg">' + safeRaw + '</div>' +
-    '</div></body></html>';
-  }
+  // 结果页
+  h += "<div class=\"result\" id=\"result-page\">";
+  h += "<div class=\"stars\" id=\"star-emoji\"></div>";
+  h += "<div class=\"msg\" id=\"result-msg\"></div>";
+  h += "<div class=\"score\" id=\"result-score\"></div>";
+  h += "<button class=\"btn\" onclick=\"location.reload()\">再做一次</button>";
+  h += "</div>";
 
-  // ★ 关键修复：JSON嵌入<script>标签时，不能做HTML转义！
-  // <script>内是原始文本模式，&quot;不会被还原成引号，会导致JS语法错误
-  // 只需要转义 </script> 防止标签逃逸即可
-  var qJson = JSON.stringify(questions).replace(/<\/script>/gi, '<\\/script>');
+  // ★ 极简JS：只做交互逻辑（点击判对错/翻页/显示结果），不做任何DOM内容生成
+  h += "<script>";
+  h += "var TOTAL=" + questions.length + ";";
+  h += "var cur=0,score=0;";
+  h += "var answers=" + JSON.stringify(questions.map(function(q){return q.answer;})) + ";";     // ["A","B",...]
+  h += "var explanations=" + JSON.stringify(questions.map(function(q){return q.explanation;})) + ";";  // ["解析1","解析2",...]
 
-  var h = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>练习题</title>';
-  h += '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:linear-gradient(135deg,#fce4ec,#e8daef);min-height:100vh;color:#333}';
-  h += '.hd{background:linear-gradient(135deg,#ff8fab,#c8b6ff);padding:18px;text-align:center;color:#fff;font-size:17px;font-weight:700}';
-  h += '.info{display:flex;justify-content:space-between;padding:12px 16px;background:#fff;margin:12px;border-radius:14px;font-size:14px;font-weight:700;color:#5e548e}';
-  h += '.pb{height:6px;background:#eee;margin:0 16px}.pf{height:100%;background:linear-gradient(90deg,#ff8fab,#c8b6ff);transition:width .4s}';
-  h += '.qa{margin:16px;padding:20px;background:#fff;border-radius:16px}.qn{font-size:13px;color:#9d8eb5;margin-bottom:8px}';
-  h += '.qt{font-size:16px;font-weight:700;color:#5e548e;margin-bottom:16px;line-height:1.6}';
-  h += '.opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
-  h += '.opt{padding:14px;border:2px solid #e8dff5;border-radius:12px;cursor:pointer;font-size:14px;display:flex;align-items:center}.ok{border-color:#10b981;background:#ecfdf5}.ng{border-color:#ef4444;background:#fef2f2}.sc{border-color:#10b981;background:#ecfdf5}';
-  h += '.lt{display:inline-block;width:26px;height:26px;border-radius:50%;background:#f0e6ff;color:#5e548e;font-size:13px;font-weight:700;text-align:center;line-height:26px;margin-right:10px}';
-  h += '.ex{margin:16px;padding:14px;background:#fefce8;border-left:4px solid #f59e0b;font-size:13px;color:#92400e;display:none}.ex.show{display:block}';
-  h += '.result{text-align:center;padding:30px 20px}.stars{font-size:60px}.msg{font-size:20px;font-weight:700;color:#5e548e;margin-bottom:8px}.score{font-size:16px;color:#9d8eb5;margin-bottom:24px}';
-  h += '.btn{padding:12px 28px;border:none;border-radius:20px;background:linear-gradient(135deg,#ff8fab,#c8b6ff);color:#fff;font-size:15px;font-weight:700;cursor:pointer}</style></head><body>';
-  h += '<div class="hd">语文小帮手 - 练习题</div>';
-  h += '<div class="info"><div id="sc">0分</div><div id="pt">第1题</div><div>❤️❤️❤️</div></div>';
-  h += '<div class="pb"><div class="pf" id="pbf"></div></div>';
-  h += '<div id="qa" class="qa"></div><div id="ex" class="ex"></div>';
-  h += '<div id="result" class="result" style="display:none"></div>';
+  // 点击选项
+  h += "function sO(qi,el){";
+  h += "  var oi=parseInt(el.getAttribute(\"data-idx\"));";
+  h += "  var container=document.getElementById(\"q\"+qi);";
+  h += "  var opts=container.querySelectorAll(\".opt\");";
 
-  h += '<script>var qs=' + qJson + ';var st={i:0,s:0,t:qs.length};var L=["A","B","C","D"];';
-  h += 'function rnd(){if(st.i>=st.t){showR();return}var q=qs[st.i];var a=document.getElementById("qa");';
-  h += 'var h="<div class=qn>第"+(st.i+1)+"题/"+st.t+"题</div>";h+="<div class=qt>"+q.question+"</div>";h+="<div class=opts>";';
-  h += 'for(var j=0;j<q.options.length;j++){h+="<div class=opt id=o"+j+" onclick=sO("+j+")><span class=lt>"+L[j]+"</span>"+q.options[j]+"</div>}';
-  h += 'a.innerHTML=h;document.getElementById("pbf").style.width=(st.i/st.t*100)+"%";document.getElementById("pt").textContent="第"+(st.i+1)+"题";document.getElementById("ex").className="ex"} ';
-  h += 'window.sO=function(idx){if(st.a&&st.a[st.i]!==undefined)return;var q=qs[st.i];var ok=L[idx]===q.answer;if(!st.a)st.a={};st.a[st.i]=idx;';
-  h += 'var el=document.getElementById("o"+idx);if(ok){el.className+=" ok";st.s+=20}else{el.className+=" ng"}';
-  h += 'for(var k=0;k<q.options.length;k++){if(L[k]===q.answer&&k!==idx){var c=document.getElementById("o"+k);c.className+=" sc"}}';
-  h += 'document.getElementById("sc").textContent=st.s+"分";document.getElementById("ex").innerHTML="<strong>解析：</strong>"+q.explanation;document.getElementById("ex").className="ex show";';
-  h += 'setTimeout(function(){st.i++;rnd()},1500)};';
-  h += 'function showR(){document.getElementById("qa").style.display="none";document.getElementById("ex").style.display="none";';
-  h += 'var r=document.getElementById("result");r.style.display="block";';
-  h += 'var star=st.s>=80?"🌟🌟🌟":st.s>=60?"🌟🌟":"🌟";var msg=st.s>=80?"太棒了！":st.s>=60？"还不错！":"继续加油！";';
-  h += 'r.innerHTML="<div class=stars>"+star+"</div><div class=msg>"+msg+"</div><div class=score>"+st.s+"/"+(st.t*20)+"</div><button class=btn onclick=location.reload()>再做一次</button>"}';
-  h += 'rnd();<\/script></body></html>';
+  // 已答过则忽略
+  h += "  for(var k=0;k<opts.length;k++){if(opts[k].classList.contains(\"ok\")||opts[k].classList.contains(\"ng\"))return;}";
+
+  // 判断对错
+  h += "  var AL=\"ABCD\";";
+  h += "  var correct=(answers[qi]===AL[oi]);";
+  h += "  var el2=document.getElementById(\"q\"+qi+\"_o\"+oi);";
+  h += "  if(correct){el2.classList.add(\"ok\");score+=20;}else{el2.classList.add(\"ng\");}";
+
+  // 显示正确答案
+  h += "  var ci=AL.indexOf(answers[qi]);";
+  h += "  if(ci!==oi){document.getElementById(\"q\"+qi+\"_o\"+ci).classList.add(\"sc\");}";
+
+  // 更新分数和解析
+  h += "  document.getElementById(\"sc\").textContent=score+\"分\";";
+  h += "  document.getElementById(\"ex-text\").textContent=explanations[qi];";
+  h += "  document.getElementById(\"ex-box\").classList.add(\"show\");";
+
+  // 延迟跳下一题
+  h += "  setTimeout(function(){";
+  h += "    document.getElementById(\"q\"+cur).classList.remove(\"active\");";
+  h += "    cur++;";
+  h += "    document.getElementById(\"ex-box\").classList.remove(\"show\");";
+  h += "    if(cur>=TOTAL){showResult();return;}";
+  h += "    document.getElementById(\"q\"+cur).classList.add(\"active\");";
+  h += "    document.getElementById(\"pt\").textContent=\"第\"+(cur+1)+\"题/"+questions.length+"题\";";
+  h += "    document.getElementById(\"pbf\").style.width=Math.round(cur/TOTAL*100)+\"%\";";
+  h += "  },1500)";
+  h += "}"; // end sO
+
+  // 显示结果页
+  h += "function showResult(){";
+  h += "  var activeQ=document.querySelector(\".qa.active\");if(activeQ)activeQ.classList.remove(\"active\");";
+  h += "  document.getElementById(\"ex-box\").classList.remove(\"show\");";
+  h += "  document.getElementById(\"pt\").textContent=\"完成!\";";
+  h += "  document.getElementById(\"pbf\").style.width=\"100%\";";
+  h += "  var rp=document.getElementById(\"result-page\");rp.classList.add(\"show\");";
+  h += "  var star=score>=80?\"🌟🌟🌟\":score>=60?\"🌟🌟\":\"🌟\";";
+  h += "  var msg=score>=80?\"太棒了！\":score>=60?\"还不错！\":\"继续加油！\";";
+  h += "  document.getElementById(\"star-emoji\").textContent=star;";
+  h += "  document.getElementById(\"result-msg\").textContent=msg;";
+  h += "  document.getElementById(\"result-score\").textContent=score+\"/\"+(TOTAL*20)";
+  h += "}";
+
+  h += "<\/script></body></html>";
   return h;
 }
+
+// HTML转义工具函数（在generateStandaloneQuizHtml中使用）
+function escHtml(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 
 // ===== 解析章节 =====
 function parseSections(text) {
