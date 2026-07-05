@@ -230,23 +230,39 @@ async function renderWrongResult(text) {
   _currentQuizUrl = shareUrl;
   _currentQuizData = quizData || '';
   _currentQuizId = shortId;
+  _quizCount = parsedQuestions.length; // ★ 记录题目数供 UI 显示
 
   html += '<div class="quiz-section" id="quiz-section-wrap">' +
     '<div class="quiz-title">📝 同知识点练习题</div>';
 
   if (quizData) {
-    // 有数据时显示操作按钮
+    // ★ v62 新设计：主推下载文件，不依赖任何外部服务
     html += '<div class="quiz-link-box" style="background:#f0faf0;border:2px dashed #4ade80;border-radius:14px;padding:16px;margin-top:12px;">' +
-      '<div id="quiz-status-text" style="font-size:13px;color:#2e7d32;font-weight:700;margin-bottom:10px;text-align:center;">📱 练习题已就绪！点击下方按钮上传到云端 →</div>' +
+      '<div id="quiz-status-text" style="font-size:13px;color:#2e7d32;font-weight:700;margin-bottom:10px;text-align:center;">✅ ' + (_quizCount || '?') + '道练习题已生成！选择发送方式 👇</div>' +
       '<div id="quiz-buttons-row" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px;">' +
+        // ★ 主按钮：下载文件（100%可靠）
+        '<button id="btn-download-quiz" class="btn-copy" style="background:linear-gradient(135deg,#f472b6,#ec4899);" onclick="downloadQuizFile()">📥 下载练习题</button> ' +
+        // 辅助：复制链接（同浏览器可用）
         '<button id="btn-copy-quiz" class="btn-copy" onclick="copyQuizLink()">📋 复制链接</button> ' +
-        '<button id="btn-upload-quiz" class="btn-copy" style="background:linear-gradient(135deg,#60a5fa,#3b82f6);" onclick="uploadQuizToGithub()">☁️ 上传到云端</button> ' +
-        '<button class="btn-copy" style="background:linear-gradient(135deg,#4ade80,#22c55e);" onclick="window.open(\'' + shareUrl.replace(/'/g, '\\\'') + '\',\'_blank\')">🔗 本地测试</button> ' +
+        // 备选：上传云端（需要网络+Token）
+        '<button id="btn-upload-quiz" class="btn-copy" style="background:linear-gradient(135deg,#94a3b8,#64748b);font-size:12px;" onclick="uploadQuizToGithub()" title="需要网络，可能失败">☁️ 云端分享</button> ' +
       '</div>' +
-      '<div class="qr-code-box" id="qr-box" style="text-align:center;padding:12px;background:#fff;border-radius:12px;min-height:100px;display:flex;flex-direction:column;align-items:center;justify-content:center;">' +
-        '<div id="qr-placeholder">⏳ 点击"上传到云端"后生成二维码</div>' +
+
+      // 下载说明
+      '<div id="download-hint" style="background:#fdf2f8;border-radius:10px;padding:12px;margin-bottom:12px;">' +
+        '<p style="font-size:13px;color:#be185d;font-weight:700;margin:0 0 6px 0;">📌 推荐方式：下载 → 发微信</p>' +
+        '<ol style="font-size:12px;color:#666;margin:4px 0;padding-left:18px;line-height:1.7;">' +
+          '<li>点击 <b>📥 下载练习题</b> 按钮</li>' +
+          '<li>得到一个 .html 小文件（约几KB）</li>' +
+          '<li>把文件直接发到家长微信群</li>' +
+          '<li>家长点开就能做题 ✅ 无需安装任何东西</li>' +
+        '</ol>' +
       '</div>' +
-      '<p id="qr-hint" style="font-size:11px;color:#888;text-align:center;margin-top:8px;">👆 上传后复制链接发到微信，家长手机直接打开做题</p>' +
+
+      // 二维码区域（隐藏为主，上传成功后显示）
+      '<div class="qr-code-box" id="qr-box" style="text-align:center;padding:12px;background:#fff;border-radius:12px;min-height:100px;display:none;flex-direction:column;align-items:center;justify-content:center;">' +
+      '</div>' +
+      '<p id="qr-hint" style="font-size:11px;color:#888;text-align:center;margin-top:8px;display:none;">👆 扫码打开练习题</p>' +
     '</div>';
   } else {
     // 无数据时显示重试按钮
@@ -258,13 +274,7 @@ async function renderWrongResult(text) {
 
   html += '</div>'; // 结束 quiz-section
 
-  // 有数据时生成二维码（用 shareUrl，不再覆盖为 localUrl）
-  if (quizData) {
-    setTimeout(function() {
-      var qrBox = document.getElementById('qr-box');
-      if (qrBox) generateQRCode(qrBox, shareUrl);
-    }, 100);
-  }
+  // v62: 不再自动生成二维码（默认隐藏，上传成功后显示）
 
   if (!html) html = '<div class="result-card pink-border"><div class="card-content">' + formatContent(text) + '</div></div>';
 
@@ -385,6 +395,55 @@ function copyFallback(url) {
   ta.select();
   try { document.execCommand('copy'); showToast('✅ 链接已复制！'); } catch(e) { alert('自动复制失败，请手动复制：\n\n' + url); }
   document.body.removeChild(ta);
+}
+
+// ===== v62: 下载练习题 HTML 文件（100%可靠，不依赖任何外部服务）=====
+function downloadQuizFile() {
+  if (!_currentQuizData) {
+    alert('⚠️ 没有练习题数据！');
+    return;
+  }
+
+  // 重新读取最新数据
+  if (_currentQuizId) {
+    try {
+      var latestData = localStorage.getItem('quiz_' + _currentQuizId);
+      if (latestData && latestData.length > (_currentQuizData || '').length) {
+        _currentQuizData = latestData;
+      }
+    } catch(e) {}
+  }
+
+  // 生成完整独立的练习题页面
+  var htmlContent = generateStandaloneQuizHtml(_currentQuizData, _currentQuizId);
+
+  // 用 Blob + download 触发下载
+  var blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = '语文练习题_' + (_currentQuizId || 'quiz') + '.html';
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+
+  // 清理
+  setTimeout(function() {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
+
+  // 更新 UI 状态
+  var btn = document.getElementById('btn-download-quiz');
+  if (btn) {
+    btn.textContent = '✅ 已下载';
+    btn.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+  }
+  var statusText = document.getElementById('quiz-status-text');
+  if (statusText) statusText.textContent = '📥 文件已下载！把 .html 文件发到微信群即可';
+
+  showToast('📥 练习题已下载！发送到微信即可');
 }
 
 // ===== GitHub API 上传练习题 =====
