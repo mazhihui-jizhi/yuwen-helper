@@ -623,8 +623,10 @@ function generateStandaloneQuizHtml(quizText, quizId) {
     '</div></body></html>';
   }
 
-  var qJson = JSON.stringify(questions)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  // ★ 关键修复：JSON嵌入<script>标签时，不能做HTML转义！
+  // <script>内是原始文本模式，&quot;不会被还原成引号，会导致JS语法错误
+  // 只需要转义 </script> 防止标签逃逸即可
+  var qJson = JSON.stringify(questions).replace(/<\/script>/gi, '<\\/script>');
 
   var h = '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>练习题</title>';
   h += '<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:sans-serif;background:linear-gradient(135deg,#fce4ec,#e8daef);min-height:100vh;color:#333}';
