@@ -399,9 +399,7 @@ async function uploadQuizToGithub(retryCount) {
   GITHUB_TOKEN = localStorage.getItem("github_token") || DEFAULT_GITHUB_TOKEN || "";
 
   if (!GITHUB_TOKEN) {
-    alert("请先设置 GitHub Token！
-
-点击右上角 ⚙️ 设置按钮，填入 GitHub Personal Access Token");
+    alert("请先设置 GitHub Token！\n\n点击右上角 ⚙️ 设置按钮，填入 GitHub Personal Access Token");
     if (btn) { btn.disabled = false; btn.textContent = "☁️ 上传云端"; }
     return;
   }
@@ -418,9 +416,7 @@ async function uploadQuizToGithub(retryCount) {
   }
 
   if (!_currentQuizData || _currentQuizData.length === 0) {
-    alert("⚠️ 没有练习题数据！
-
-请先等「开始分析」完成。");
+    alert("⚠️ 没有练习题数据！\n\n请先等「开始分析」完成。");
     return;
   }
 
